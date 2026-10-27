@@ -1,0 +1,63 @@
+---
+title: "Statistisk processtyring (SPC)"
+author: "Amanda Wittendorf"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r Pre-setting_plots, message=FALSE, warning=FALSE, include=FALSE}
+library(ggplot2)
+
+standard_tema <- theme_minimal(base_size = 11, base_family = "sans") + 
+  theme(
+    plot.title = element_text(face = "bold", 
+                              size = rel(1.2), 
+                              color = "#333333"), 
+    plot.subtitle = element_text(face = "italic", 
+                                 size = rel(0.95), 
+                                 color = "#555555"), 
+    axis.title = element_text(size = rel(0.9)), 
+    axis.text = element_text(size = rel(0.85)), 
+    legend.position = "bottom"
+  )
+
+# Set as global standard-theme
+theme_set(standard_tema)
+```
+
+This R Markdown is based upon the guideline of the github-website https://anhoej.github.io/qicharts2/articles/qicharts2.html. 
+
+------------------
+
+Firstly, I need to run the R packages `qicharts2 and lock a random number generator to make examples reproducible
+
+```{r package,, message=FALSE, warning=FALSE, include=FALSE}
+library(qicharts2)
+
+# Number generator
+set.seed(19)
+```
+
+The first run trough is going to be based upon a generated number (n = 24) for a normal distribution - this is saved in a objected call
+```{r}
+y <- rnorm(24)
+```
+
+
+```{r}
+p <- qic(y)
+p + labs(
+    title    = "Run chart",
+    subtitle = "Based on a generated number (n = 24)" 
+  )
+```
+
+
+
+
+
+
+
+
+
+

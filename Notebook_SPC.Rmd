@@ -1,0 +1,281 @@
+---
+title: "Statistisk processtyring (SPC)"
+output: html_document
+---
+
+> Denne sektion er baseret på hjemmesiden (https://anhoej.github.io/qicharts2/articles/qicharts2.html), hvori pakken `qicharts2` er gennemgået. 
+
+```{r datasaet, message=FALSE, warning=FALSE, include=FALSE}
+library(qicharts2)
+```
+
+
+```{r Pre-setting_plots, message=FALSE, warning=FALSE, include=FALSE}
+library(ggplot2)
+
+#===================================================
+# THEME
+#===================================================
+standard_tema <- theme_minimal(base_size = 11, base_family = "sans") + 
+  theme(
+    plot.title = element_text(face  = "bold", 
+                              size  = rel(1.2), 
+                              color = "#333333"), 
+    plot.subtitle = element_text(face  = "italic", 
+                                 size  = rel(0.95), 
+                                 color = "#555555"), 
+    axis.title = element_text(size = rel(0.9)), 
+    axis.text = element_text(size = rel(0.85)), 
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+theme_set(standard_tema)
+
+#===================================================
+# COLORS 
+#===================================================
+mint      <- "#66C2A5"
+koral     <- "#FC8D62"
+pink      <- "#E78AC3"
+blue      <- "#8DA0CB"
+apple     <- "#A6D854"
+yellow    <- "#FFD92F"
+sand      <- "#E5C494"
+stone     <- "#B3B3B3"
+color_pal <- "Set2"
+```
+
+Begrebet SPC (engelsk: Statistical Process Control) dækker over en statistisk metode til at overvåge, styre og forbedre en arbejdsproces for at sikre stabilitet og ensartet kvalitet i sundhedsvæsenet. Det vigtigste princip for denne metode er *at forstå variation over tid for dermed at afgøre, om en proces reelt har ændret sig, eller om udsving blot skyldes tilfældigheder.*
+
+🙂 Mindre spild og færre fejl pga. reduceret kassationer og omforarbejdning  
+
+🙂 Højere ensartethed 
+
+🙂 Rettidig indgriben ved at spotte tendenser før de udvikler sig til fejl  
+
+----
+
+## Variation - det vigtigste princip 
+
+Variation over tid vil næsten altid forekommer. Man skal derfor kende og afgøre hvilken af de forskellige typer det kan skyldes. 
+
+Formålet med at analysere procesdata er at opdage, hvornår en reel ændring sker, så man kan reagere hensigtsmæssigt. Tallene kan godt ændre sig uden at processen har ændret sig, og omvendt kan processen ændre sig uden at det straks ses tydeligt i tallene; derfor har man brug for metoder, der kan skelne mellem støj og signal.
+
+### 1. Almindelig variation *(Common Cause Variation)*
+
+**Hvornår:** Findes i alle processer og gør processen forudsigelig inden for visse grænser.
+
+**Hvorfor:** Forhold, der altid er til stede i systemet og anses derfor som værende praksis "støj" eller naturlig tilfældig variation *(Random Effects)*.
+
+**Håndtering:**
+
+**SPC-diagram:** Data opføre sig tilfældigt inden for de forventede grænser.
+
+### 2. Særlig variation *(Special Cause Variation)*
+
+**Hvornår:** Normalt ikke til stede i processen og opfattes derfor som et signal om, at noget har ændret sig.
+
+**Hvorfor:** Usædvanlige eller ekstraordinære forhold som gør processen mindre forudsigelig.
+
+**Håndtering:** Anledning til at undersøge processen nærmere. 
+
+**SPC-diagram:** Data vil ofte danne mønstre, som statistiske regler kan opdage.
+
+------
+
+## SPC-diagrammer 
+
+Der findes to typer af SPC-diagrammer; (1) seriekort *(Run charts)* og (2) kontrolkort *(Control Charts)*. Disse bruges til at skelne mellem de ovenstående typer af variation. 
+
+### Seriekort (engelsk: Run Charts) 
+
+**Formål:** At illustrere de basale tendenser eller mønster ved blot at plotte data over tid med en midterlinje (typisk medianen)
+
+**Kode:** `qic()`
+
+#### EKSEMPEL
+
+I dette eksempel, vil baseres på 24 genererede tal fra en normalfordeling, som er gemt i et navngivet objekt kaldt y.
+
+```{r seriekort, echo=TRUE, message=FALSE, warning=FALSE}
+#-------------------------------------------------------------------
+# Præ-kodning
+#-------------------------------------------------------------------
+set.seed(19)                        # Bibeholder reproducerbarheden
+y <- rnorm(24)                      # 24 genererede tal fra en normalfordeling
+options(qic.clshade = FALSE)        # Fjerner den grå baggrund i figurerne 
+
+#-------------------------------------------------------------------
+# Figur
+#-------------------------------------------------------------------
+p <- qic(y) 
+p + labs(
+    title    = "Seriekort",
+    subtitle = "Baseret på generede en normalfordelt talværdi (n = 24)",
+    y        = "Måling",
+    x        = "Observationnummer"
+  )
+```
+
+### Kontrolkort (engelsk: Control Charts)
+
+**Formål:** Plot processens gennemsnit (med tilhørende 95%-CI) over tid i forhold til midterlinjer for at vise om der er stabilitet eller der er behov for indgreb. 
+
+**Variation:** Figuren visualiserer derudover også grænserne for den naturlige variation 
+
+#### Typer af kontrolkort 
+
+Det findes forskellige typer af kontrolkort, alt efter hvad man ønsker at undersøge (korttype tilføjes vha. `chart = [korttype]`: 
+
+| Korttype | Anvendelse | Fordeling | 
+|:---------|:----------:|:---------:|
+| i | Individuelle målinger (fx blodtryk, ventetid, alder) | Normal (Gaussian) | 
+| MR | Bevægelsesbredde mellem målinger | Normal |
+| xbar | Gennemsnit af grupper | Normal |
+| s | Standardafvigelser i grupper | Normal | 
+| t | Tid mellem sjældne hændelser | Eksponentiel |
+| c | Antal fejl/hændelser (fx antal hændelser pr. periode) | Poisson | 
+| u | Rate af fejl/hændelser | Poisson |
+| p | Procent/andel (fx andel genindlæggelser)  | Binomial |
+| g | Antal muligheder mellem sjældne hændelser | Geometrisk | 
+| Laney P | Procent/andel (fx andel genindlæggelser) | Binomial |
+| Laney U | Hændelsesrate pr. eksponering (fx infektioner pr. 1.000 patientdage) | Poisson |
+
+Valget af kontrolkort bør styres af datatypen og den underliggende fordeling:
+
+1. Er y-aksen en måling, et antal eller en andel?
+
+2. Varierer "n" (eksponering, patientdage, antal patienter osv.) mellem perioderne?
+
+3. Er hændelserne sjældne eller hyppige?
+
+Hvis datatypen matcher kontrolkortets antagelser, bliver kontrolgrænserne og signalerne om specialårsagsvariation mere pålidelige.
+
+#### EKSEMPEL
+
+Forsætter fra tidligere eksempel, men hvor der kontrolleres for individuelle målinger - dvs. tilføjelse af `chart = 'i'` 
+
+```{r kontrolkort, echo=TRUE, message=FALSE, warning=FALSE}
+p1 <- qic(y, chart = 'i')
+p1 + labs(
+    title    = "Kontrolkort",
+    y        = "Måling",
+    x        = "Observationnummer"
+  )
+```
+
+
+### Fortolkning af diagrammerne 
+
+Til at fortolke diagrammerne kan forskellige regler blive anvendt: **(1) Shewharts 3-sigma-**, **(2) Western Electric-** og **(3) Anhøj-reglerne**. 
+
+#### Shewharts 3σ-regel
+
+Reglen siger, at hvis et datapunkt ligger uden for kontrolgrænserne (3 standardafvigelser (\(SD\)) fra middelværdien), betragtes det som et signal om særlig variation. 
+
+🙂 God til at opdage store og pludselige ændringer (>=3 SD).
+
+🙁 Mindre eller gradvise ændringer kan fortsætte længe uden at blive opdaget (<3 SD).
+
+#### Western Electric-reglerne
+
+Reglerne blev udvikler til Shewhart-kontrolkort for at opdage signaler om særlig variation (større eller mere pludselige ændringer). Hertil bruges af middelværdi og kontrolgrænser (typisk ±3σ). 
+
+🙂 Meget følsomme over for mindre procesændringer.
+
+🙂 Standard i mange kvalitetsstyringssystemer og velegnede til industrielle produktionsprocesser.
+
+🙁 Kan give mange falske alarmer.
+
+🙁 Flere regler betyder større risiko for "overreaktion" på tilfældig variation.
+
+| Regel | Signal | Typisk fortolkning | 
+|:------|:------:|:------------------:|
+| 1 | Ét punkt uden for ±3σ | Kraftig ændring eller enkeltstående speciel årsag | 
+| 2 | 2 ud af 3 punkter uden for ±2σ på samme side af centerlinjen | Moderat forskydning af procesniveauet |
+| 3 | 4 ud af 5 punkter uden for ±1σ på samme side | Vedvarende mindre forskydning |
+| 4 | 8 på hinanden følgende punkter på samme side af centerlinjen | Skift i procesgennemsnittet | 
+
+*Der findes også en udvidet version med 8 regler (ofte kaldt Nelson-reglerne), som blandt andet tester for trends, oscillationer og usædvanligt lille variation.*
+
+#### Anhøj-reglerne
+
+Reglerne er udviklet til forbedring i sundhedsvæsenet og andre organisatoriske processer. I pakken `qicharts2` anvendes de til at *identificere mindre og moderate vedvarende ændringer over tid baseret på medianen*. 
+
+🙂 Enkel metode, der ikke kræver beregning af standardafvigelse (\(SD\)).
+
+🙂 Robust over for små datasæt.
+
+🙁 Mindre følsom over for korte, kraftige udsving.
+
+🙁 Fanger ikke alle mønstre, som Western Electric-reglerne kan opdage.
+
+Reglerne bygger på to simple tests omkring medianen:
+
+**A. Usædvanlig lang run:** En række punkter på samme side af medianen. Hvis den længste run er længere end forventet ved tilfældighed, er det et signal om systematisk ændring.
+
+**B. For få krydsninger af medianen:** Hvis datapunkterne krydser medianen færre gange end forventet, tyder det på, at processen ikke opfører sig tilfældigt.
+
+##### Grafisk visualisering til vurdering af reglerne {.tabset .tabset-fade}
+
+###### En enkeltstående fejl *(Single Outlier)*
+
+```{r kontrolkort_enkeltstående_fejl, echo=TRUE, message=FALSE, warning=FALSE}
+# Fejl (n = 22) med 4 SD 
+y[22] <- 4
+
+p2 <- qic(y, chart = 'i')
+p2 + 
+  labs(title    = "Figure A",
+       subtitle = "Baseret på generede en normalfordelt talværdi (n = 24)",
+       y        = "Måling",
+       x        = "Observationnummer") +
+    annotate("rect", 
+           xmin  = 21.9, 
+           xmax  = 22.1, 
+           ymin  = -Inf, 
+           ymax  = Inf, 
+           fill  = koral, 
+           alpha = 0.1)
+```
+
+###### Et permanent niveauskift *(Persistent Shift)*
+
+```{r permanent_niveauskift, echo=TRUE, message=FALSE, warning=FALSE}
+# Ændring af datapunkt 13-24 
+y[13:24] <- rnorm(12,          # Generer 12 tilfældige tal fra en normalfordeling
+                  mean = 2)    # Gens. er løftet til 2 --> simulerer en pludselig ændring 
+
+p3 <- qic(y, chart = 'i')
+p3 + 
+  labs(title    = "Figure B",
+       subtitle = "Baseret på generede en normalfordelt talværdi (n = 24)",
+       y        = "Måling",
+       x        = "Observationnummer") +
+    annotate("rect", 
+           xmin  = 13, 
+           xmax  = 24, 
+           ymin  = -Inf, 
+           ymax  = Inf, 
+           fill  = koral, 
+           alpha = 0.1)
+```
+
+##### Fortolkning
+
+Figur A viser en enkeltstående fejl ved observationnummer 22 (\(x = 22\)), hvoraf fejlen overskrider den øvre grænseværdi (\(UCL = 3.1\)), og derfor farves orange. Fordi datapunktet overskrider UCL, vurderes processen som ikke-statistisk stabil ud fra Shewharts 3σ-regel og den første Western Electric-regel. Modsat til de andre to regelsæt, er der ingen tegn på signal ifølge Anhøj-reglerne, da de fokuserer på antal krydsninger og længste run på samme side af medianen. 
+
+Modsat Figur A viser Figur B et permanent niveauskift mellem observation 13 og 24 (\(x = 13;24\)), hvoraf der er genereret observationer med en højere middelværdi. Da ingen datapunkter overskrider kontrolgrænserne (\(LCL = -2.1; UCL = 4.2\)), ses der ikke signal ifølge Shewharts 3σ-regel. Der observeres derimod en lang sekvens af datapunkter over centerlinjen efter observation 13.
+
+Western Electric-regel 4 er opfyldt, idet mere end 8 successive punkter ligger på samme side af centerlinjen (\(n = 12\)). Tilsvarende indikerer Anhøj-reglerne en procesændring, da der forekommer få krydsninger af centerlinjen og en usædvanlig lang run på samme side af centerlinjen. Det vurderes derfor, at processen har gennemgået et systematisk niveauskift efter observation 13.
+
+----
+
+
+
+
+
+
+
