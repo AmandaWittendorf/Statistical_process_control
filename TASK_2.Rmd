@@ -1,0 +1,317 @@
+---
+title: "Case 2: Clostridium difficile infections"
+author: "Amanda Wittendorf"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+> Denne sektion er baseret afsnittet "Case 2: Clostridium difficile infections" fra hjemmesiden (https://anhoej.github.io/qicharts2/articles/qicharts2.html), hvori pakken `qicharts2` er gennemgået. 
+
+```{r datasaet, message=FALSE, warning=FALSE, include=FALSE}
+library(qicharts2)
+```
+
+```{r Pre-setting_plots, message=FALSE, warning=FALSE, include=FALSE}
+library(ggplot2)
+library(statistik)
+
+#===================================================
+# THEME
+#===================================================
+standard_tema <- theme_minimal(base_size = 11, base_family = "sans") + 
+  theme(
+    plot.title = element_text(face  = "bold", 
+                              size  = rel(1.2), 
+                              color = "#333333"), 
+    plot.subtitle = element_text(face  = "italic", 
+                                 size  = rel(0.95), 
+                                 color = "#555555"), 
+    axis.title = element_text(size = rel(0.9)), 
+    axis.text = element_text(size = rel(0.85)), 
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+theme_set(standard_tema)
+
+#===================================================
+# COLORS 
+#===================================================
+mint      <- "#66C2A5"
+koral     <- "#FC8D62"
+pink      <- "#E78AC3"
+blue      <- "#8DA0CB"
+apple     <- "#A6D854"
+yellow    <- "#FFD92F"
+sand      <- "#E5C494"
+stone     <- "#B3B3B3"
+color_pal <- "Set2"
+```
+
+## Beskrivelse af datasættet (cdi)
+
+Datasætte `cdi` stammer fra pakken `qicharts2` og indeholder data om hospitalserhvervede infektioner med Clostridioides difficile (CDI) før og efter en intervention, der havde til formål at reducere forekomsten af infektionerne. 
+
+```
+CDI er en bakteriel infektion, der ofte opstår hos patienter, som har fået antibiotikabehandling. Infektionen kan give diarré og i alvorlige tilfælde føre til svær tarmsygdom.
+```
+
+Datasættet indeholder følgende variabler:
+
+- $\text{n}$: Antal hospitalserhvervede tilfælde af Clostridioides difficile-infektion (CDI) i den pågældende måned. 
+
+- $\text{month}$: Observationsmåned. Angiver den måned, hvor data er registreret.
+
+- $\text{days}$: Antal risikodage i måneden. En risikodag defineres som én patientdag for en patient uden CDI.
+
+- $\text{period}$: Angiver, om observationen er registreret før (pre) eller efter (post) interventionen.
+
+- $\text{notes}$: Kommentarer eller annoteringer til de enkelte observationer.
+
+```{r datasæt, echo=FALSE, message=FALSE, warning=FALSE}
+cdi <- cdi |> 
+  rename(intervention = period,
+         reg_m        = month,
+         risk_d       = days)
+```
+
+
+## SBP-analyse
+
+En tabeloversigt og et seriekort vil blive konstrueret for at få et generelt overblik over forløbet.
+
+```{r oversigt, echo=FALSE, warning=FALSE, message=FALSE}
+library(DT)
+#--------------------------
+cdi |> 
+  as_tibble() |> 
+  rename(
+    "Observationsmåned" = reg_m,
+    "CDI-tilfælde (n)"  = n,
+    "Risikodage"        = risk_d,
+    "Intervention"      = intervention,
+    "Noter"             = notes
+  ) |> 
+  datatable(caption = "Tabel 1: Oversigt over datasættet",
+            rownames = TRUE,
+            class = "row-border", 
+            options = list(
+              autoWidth = TRUE)) |> 
+  formatRound(columns = "Risikodage", digits = 0)
+```
+
+Tabeloversigten viser, at interventionen med antibiotika startet fra datoen 2014-11-01. For visuelt at se ændringen fra dette tidspunkt, vil noten blive inkluderet i seriekortet. 
+
+### Seriekort over hospitalserhvervede tilfælde af Clostridioides difficile-infektion (CDI) {.tabset .tabset-fade}
+
+#### Baseline-median
+
+```{r seriekort, echo=FALSE, message=FALSE, warning=FALSE}
+library(plotly)
+#-----------------------------------------------
+p1a <- qic(reg_m, n,
+           notes    = notes,             # Tilføjer noten
+           data     = cdi,
+           decimals = 0,
+           title    = 'Figur 1a: Seriekort med baseline-median',
+           ylab     = 'Målinger',
+           xlab     = 'Observationsmåned') + 
+  scale_x_date(
+    date_labels = "%Y"        # Formatet på datoen
+    ) +
+  scale_y_continuous(
+    breaks = seq(0, 30, by = 5)
+    )
+
+ggplotly(p1a)
+```
+
+**FORTOLKNING**
+
+Figur 1a viser det basale forløb over hospitalserhvervede tilfælde af Clostridioides difficile-infektion (CDI) både forinden og efter interventionen med antibiotika.
+
+Forinden interventionen ses der en højere tendens af målinger med CDI end efter. Efter interventionen falder punkterne markant og ligger næsten alle under den stiplede baseline-median på 17. Dette langvarige 'run' under midterlinjen er et statistisk tegn på særlig variation (et reelt skift i processen), som overgår den naturlige, tilfældige variation.
+
+Til at belyse om post-interventionsforløbet er påvirket af en særlig variation, vil der blive konstrueret et nyt seriekort, hvor medianen (midterlinjen) vil indgå for præ-interventionen i stedet for baseline-medianen som i Figur 1a. 
+
+#### Median for præ-interventionen
+
+```{r måned_for_note, message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr)
+library(lubridate)
+#==========================================================
+# STARTDATO
+#==========================================================
+start_dato <- min(cdi$reg_m)  
+
+#==========================================================
+# DATA FOR INTERVENTION
+#==========================================================
+note_dato <- cdi |> 
+  # Find rækker med noter
+  filter(!is.na(notes),          # Uden NA 
+         notes != "") |>         # Ikke forskellige fra tom tekst
+  slice(1) |>                    # Tag første note 
+  pull(reg_m)                    # Hent kun datoen 
+
+#==========================================================
+# FORSEL MELLEM DE TO DATOER 
+#==========================================================
+freeze_dat <- interval(start_dato, note_dato) %/% months(1)
+```
+```{r seriekort_præ_median, echo=FALSE, warning=FALSE, message=FALSE}
+p1b <- qic(reg_m, n,
+           data        = cdi,
+           decimals    = 0,
+           freeze      = freeze_dat,
+           part.labels = c('Baseline', 'Intervention'),
+           title       = 'Figur 1b: Seriekort median for præ-interventionen',
+           ylab        = 'Målinger',
+           xlab        = 'Observationsmåned') +
+  # Ændring af x-aksen
+  scale_y_continuous(
+    breaks = seq(0, 30, by = 5)
+    ) +
+  # Undertitler: præ- og post-intervention.
+  annotate("text", 
+           x = as.Date("2013-10-01"), 
+           y = 28, 
+           label = "Baseline", 
+           color = "black") +
+  annotate("text", 
+           x = as.Date("2015-05-01"), 
+           y = 28, 
+           label = "Intervention", 
+           color = "black")
+
+ggplotly(p1b)
+```
+
+**FORTOLKNING**
+
+Når medianen udelukkende beregnes på baggrund af præ-interventionen (baseline), stiger den til 19. Ved at fastholde denne baseline-median frem i tid (vist med den orange stiplede linje) ses det tydeligt, at stort set alle målinger efter interventionen ligger langt under. At så mange punkter i træk ligger under baseline-medianen bekræfter hypotesen om, at post-interventionsforløbet er påvirket af en særlig variation (en systematisk ændring).
+
+Fordi der aktivt er sket en ændre i forløbet (interventionen med antibiotika), er det muligt at splitte diagrammet op for nemmere at sammenligne de forløbs medianer (præ- vs. post-intervention)
+
+#### Opsplitning præ- og post-intervention
+
+```{r præ_vs_post, echo=FALSE, warning=FALSE, message=FALSE}
+p1c <- qic(reg_m, n,
+           data     = cdi,
+           decimals = 0,
+           part     = freeze_dat,
+           title    = 'Figur 1c: Seriekort over median for præ- og post-interventionen',
+           ylab     = 'Målinger',
+           xlab     = 'Observationsmåned') +
+  # Ændring af x-aksen
+  scale_y_continuous(
+    breaks = seq(0, 30, by = 5)
+    ) +
+  # Undertitler: præ- og post-intervention.
+  annotate("text", 
+           x = as.Date("2013-10-01"), 
+           y = 28, 
+           label = "Baseline", 
+           color = "black") +
+  annotate("text", 
+           x = as.Date("2015-05-01"), 
+           y = 16, 
+           label = "Intervention", 
+           color = "black")
+
+ggplotly(p1c)
+```
+
+**FORTOLKNING** 
+
+Når diagrammet splittes op, så præ- og post-interventionen får hver sin uafhængige median, ses effekten meget tydeligt. 
+
+For præ-interventionen er medianen for hospitalserhvervede CDI-tilfælde 19, mens den efter interventionen (post-intervention) reduceres markant til 6. Dette store spring mellem de to medianer underbygger, at interventionen med antibiotika har haft en markant og varig positiv effekt på at reducere antallet af tilfælde.
+
+###
+
+Figur 1c illustrerer, at der for begge perioder (præ- og post-intervention) kun er tegn på naturlig, tilfældig variation, når de vurderes separat.
+
+--------------------------------------
+
+For at teste for *periodernes separate stabilitet over tid tegnes et C-kontrolkort*, hvori grænseværdierne også vil indgå.
+
+```{r c_kontrolkort, warning=FALSE, echo=FALSE, message=FALSE}
+options(qic.clshade = FALSE)        # Fjerner den grå baggrund i figurerne
+#------------------------------------------------
+p2 <- qic(reg_m, n,
+    data  = cdi,
+    chart = 'c',
+    part  = freeze_dat,
+    title = 'Figur 2: Kontrolkort over antallet af CDI-tilfælde',
+    ylab  = 'Målinger',
+    xlab  = 'Observationsmåned') +
+  # Ændring af x-aksen
+  scale_y_continuous(
+    breaks = seq(0, 40, by = 10)
+    ) +
+  # Undertitler: præ- og post-intervention.
+  annotate("text", 
+           x = as.Date("2013-10-01"), 
+           y = 34.7, 
+           label = "Baseline", 
+           color = "black") +
+  annotate("text", 
+           x = as.Date("2015-05-01"), 
+           y = 18.1, 
+           label = "Intervention", 
+           color = "black")
+
+ggplotly(p2)
+```
+
+**FORTOLKNING** 
+
+Figur 2 viser et præ- og post-kontrolkort (c-kort) over interventionen med antibiotika, hvor kontrolgrænserne er genberegnet for de to faser.
+
+Vurderet ud fra Shewharts 3σ-regel ses der ingen direkte tegn på signal i form af datapunkter, der overskrider de øvre eller nedre kontrolgrænser (UCL/LCL) i nogen af perioderne. Målingen fra juni 2014 falder markant, men ligger fortsat inden for den nedre kontrolgrænse på 5,7. Der ses heller ikke signal efter Western Electric-reglen om 2 ud af 3 på hinanden følgende punkter tæt på kontrolgrænserne.
+
+Der ses imidlertid et tydeligt signal om særlig variation i form af et processkift (shift) efter interventionen. Alle 11 datapunkter i postinterventionsperioden ligger under den oprindelige centerlinje på 18,7, hvilket udgør et langt run på samme side af centerlinjen og taler for, at processen har flyttet sig til et nyt og lavere niveau.
+
+Det genberegnede kontrolkort indikerer, at processen efter interventionen har stabiliseret sig omkring en ny centerlinje på 7,1 tilfælde pr. måned. Under forudsætning af uændrede procesforhold kan det fremtidige forventelige udfald forventes at ligge inden for de beregnede kontrolgrænser på ca. 0 til 15 tilfælde af hospitalserhvervet CDI pr. måned.
+
+------------------------------
+
+Det er også muligt at vurdere *infektions-raten for CDI (U-kontrolkort)*, hvilket ikke begrænses af et konstant eksponeringsniveau som fx antal CDI-tilfælde pr. måned. Hvis patientdagene er konstante fra måned til måned, vil et u-kort give samme konklusion som et c-kort, men blot være forskellig iht skalaen. 
+
+```{r U_kontrolkort, echo=FALSE, message=FALSE, warning=FALSE}
+p3 <- qic(reg_m, n, risk_d,
+          data     = cdi,
+          chart    = 'u',
+          part     = freeze_dat,
+          multiply = 10000,            # 10.000 patientdage
+          title = 'Figur 3: Kontrolkort over infektionsraten for CDI (per 10.000 persondage)',
+          ylab  = 'Målinger',
+          xlab  = 'Observationsmåned') +
+  # Ændring af x-aksen
+  scale_y_continuous(
+    breaks = seq(0, 30, by = 5)
+    ) +
+  # Undertitler: præ- og post-intervention.
+  annotate("text", 
+           x = as.Date("2013-10-01"), 
+           y = 24.9, 
+           label = "Baseline", 
+           color = "black") +
+  annotate("text", 
+           x = as.Date("2015-05-01"), 
+           y = 13.6, 
+           label = "Intervention", 
+           color = "black")
+
+ggplotly(p3)
+```
+
+**FORTOLKNING** 
+
+Figur 3 viser præcist det som førhen blev omtalt, at eksponeringsniveau her ikke er konstant, idet grænseværdierne variere alt efter mængden af patienter det pågældende år; jo flere patienter, des sikre grænseværdi. 
+
+Udover det, så understøtter figur 3 konklusionerne fra figur 2. Selvom kontrolgrænserne varierer en smule som følge af forskelle i antal persondage mellem månederne, ses det samme tydelige skift mod et lavere niveau efter interventionen. Analyser af både absolutte antal og infektionsrater peger således på en vedvarende reduktion i forekomsten af hospitalserhvervet CDI efter interventionen.
+
+

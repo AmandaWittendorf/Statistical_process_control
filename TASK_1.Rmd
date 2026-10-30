@@ -1,0 +1,243 @@
+---
+title: "Case 1: Patient harm"
+author: "Amanda Wittendorf"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+> Denne sektion er baseret afsnittet "Case 1: Patient harm" fra hjemmesiden (https://anhoej.github.io/qicharts2/articles/qicharts2.html), hvori pakken `qicharts2` er gennemgået. 
+
+```{r datasaet, message=FALSE, warning=FALSE, include=FALSE}
+library(qicharts2)
+```
+
+```{r Pre-setting_plots, message=FALSE, warning=FALSE, include=FALSE}
+library(ggplot2)
+library(statistik)
+
+#===================================================
+# THEME
+#===================================================
+standard_tema <- theme_minimal(base_size = 11, base_family = "sans") + 
+  theme(
+    plot.title = element_text(face  = "bold", 
+                              size  = rel(1.2), 
+                              color = "#333333"), 
+    plot.subtitle = element_text(face  = "italic", 
+                                 size  = rel(0.95), 
+                                 color = "#555555"), 
+    axis.title = element_text(size = rel(0.9)), 
+    axis.text = element_text(size = rel(0.85)), 
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+theme_set(standard_tema)
+
+#===================================================
+# COLORS 
+#===================================================
+mint      <- "#66C2A5"
+koral     <- "#FC8D62"
+pink      <- "#E78AC3"
+blue      <- "#8DA0CB"
+apple     <- "#A6D854"
+yellow    <- "#FFD92F"
+sand      <- "#E5C494"
+stone     <- "#B3B3B3"
+color_pal <- "Set2"
+```
+
+## Beskrivelse af datasættet (gtt)
+
+Datasætte `gtt` stammer fra pakken `qicharts2` og indeholder data om patientskade under indlæggelse (\(text{harms}\)). Metoden Global Trigger Tool bruges til at påvise bivirkning hos hospitalets patienter. Med hjælp af retrospektiv tilgang til journalgennemgang blev et tilfældigt udvalg af 20 patientjournaler hver måned  gennemgået for antallet af bivirkninger. 
+
+Datasættet indeholder følgende variabler:
+
+- $\text{admission_id}$: Individualiseret ID-numre for indlæggelse
+
+- $\text{harms}$: Antal identificerede patientskader under indlæggelsen. (1 / 2 / 3)
+
+- $\text{admission_dte}$: Dato for indlæggelse.
+
+- $\text{discharge_dte}$: Dato for udskrivelse.
+
+- $\text{month}$: Måned for udskrivelse.
+
+- $\text{days}$: Varighed af hospitalsophold i dage.
+
+- $\text{E}$: Midlertidig skade, som krævede en intervention eller behandling (Pressure ulcer / Infection / Gastrointestinal / Procedure / Medication / Other).
+
+- $\text{F}$: Midlertidig skade, som medførte forlænget indlæggelse (Gastrointestinal / Infection / Medication / Procedure).
+  
+- $\text{G}$: Permanent skader (Medication / Other)
+  
+- $\text{H}$: Skade, der krævede livsreddende behandling (Other).
+  
+- $\text{I}$: Dødelig skade (Medication).
+
+```{r datasæt, echo=FALSE, message=FALSE, warning=FALSE}
+gtt <- gtt |> 
+  # Navneændring af variablerne
+  rename(id      = admission_id,
+         in_dat  = admission_dte, 
+         out_dat = discharge_dte,
+         out_m   = month,
+         var_d   = days
+         )
+```
+
+## Oversigt over datasættet
+
+```{r oversigt, echo=FALSE, warning=FALSE, message=FALSE}
+library(DT)
+#--------------------------
+gtt |> 
+  as_tibble() |> 
+  datatable(caption = "Overview of the dataset",
+            rownames = FALSE,
+            class = "row-border", 
+            options = list(
+              autoWidth = TRUE)) 
+```
+
+### Seriekort
+
+For at få et visuelt overblik over forløbet konstrueret et seriekort *(Run charts)*
+
+```{r seriekort, echo=FALSE, message=FALSE, warning=FALSE}
+library(plotly)
+#----------------------------------------
+p <- qic(out_m, harms, var_d,
+    data     = gtt,
+    multiply = 1000,             # Per 1.000 patientdage 
+    title    = 'Figur 1: Seriekort over tilsigtet fysisk patientskader',
+    ylab     = 'Hændelser per 1.000 patientdage',
+    xlab     = 'Måned for udskrivelse') +
+  scale_x_date(
+    date_breaks = "2 months",    # Vis et mærke for hver 2. måned
+    date_labels = "%Y-%m"        # Formatet på datoen
+  )
+
+ggplotly(p)
+```
+
+**FORTOLKNING**
+
+Forløbet vurderes til at vise en naturlig tilfældig variation. Da figuren kun viser basale tendenser/mønstre, vil der konstrueret et *kontrolkort over raten af hændelser (U-kontrolkort) og andel af hændelser (p-kontrolkort)*.
+
+### Kontrolkort {.tabset .tabset-fade}
+
+#### U-kontrolkort
+
+```{r U-kontrolkort, echo=FALSE, warning=FALSE, message=FALSE}
+options(qic.clshade = FALSE)        # Fjerner den grå baggrund i figurerne #----------------------------------------------
+p2a <- qic(out_m, harms, var_d,
+          data     = gtt,
+          chart    = 'u',              # Poisson
+          multiply = 1000,             # Per 1.000 patientdage 
+          title    = 'Figur 2a: Kontrolkort over raten af tilsigtet fysisk patientskader',
+          ylab     = 'Hændelser per 1.000 patientdage',
+          xlab     = 'Måned for udskrivelse') +
+  scale_x_date(
+    date_breaks = "2 months",    # Vis et mærke for hver 2. måned
+    date_labels = "%Y-%m"        # Formatet på datoen
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 150, by = 20)
+  )
+
+ggplotly(p2a)
+```
+
+**FORTOLKNING**
+
+Det er værd at bemærke, at kontrolgrænserne (\(LCL; UCL\)) er varierende fra måned til måned i hele forløbet. Dette skyles primært en vis statistisk usikkerhed mellem månederne; fx er der i september måned (\(2010-09\)) et større antal som udskrives, hvorfor afstanden mellem kontrolgrænserne er mindre sammenlignet med juli måned (\(2010-07\)), hvor afstanden er størst og et mindre antal er blevet udskrevet. 
+
+
+#### P-kontrolkort
+```{r p-kontrolkort, echo=FALSE, warning=FALSE, message=FALSE}
+p2b <- qic(out_m,
+           harms > 0,            # Mindst 1 skade -> ✔ = TRUE
+           var_d > 0,            # Σ(patient) -> ✔ = TRUE, da alle overnatter 1 døgn
+           data      = gtt,
+           chart     = 'p',
+           y.percent = TRUE,
+           title     = 'Figur 2b: Kontrolkort over %-andel af tilsigtet fysiske patientskader',
+           xlab     = 'Måned for udskrivelse',
+           ylab     = NULL)  +
+  scale_x_date(
+    date_breaks = "2 months",    # Vis et mærke for hver 2. måned
+    date_labels = "%Y-%m"        # Formatet på datoen
+  ) 
+
+ggplotly(p2b)
+```
+
+**FORTOLKNING** 
+
+Sammenlignet med Figur 2a, er grænseværdierne her komplet vandrette (\(LCL = 1.2%0; UCL = 64.1%\)). Dette skyles den generelle matematiske forskel på, hvad de to figurer viser; hvor Figur 2A tager højde for den præcise månedlige stikprøve, tager Figur 2b højde for det vægtet gennemsnit af stikprøve. 
+
+### 
+
+**GENEREL FORTOLKNING**
+
+Ingen af figurerne giver anledning til at tro, at der foregår en særlig variation igennem forløbet. Variationen anses derfor at skyldes en naturlig tilfældig variation, da ingen punkter overskrider grænseværdierne (Shewharts 3σ-regel), kraftig forskydning mod grænseværdierne (Western Electric-reglerne) eller et usædvanlig lang run på en side (Anhøj-reglerne).
+
+Det er dog værd at bemærke, at der er et stigende antal/%-andel af tilsigtet fysiske patientskader i den sidste halvdel af forløbet (\(2010-08 til 2011-05\)) sammenlignet med den første halvdel (\(2010-01 til 2010-08\)).
+
+----------------------
+
+### Pareto analyse 
+
+For bedre at kunne identificere hvilke skader og hvilke intensitet af disse der forekommer hyppigst i forløbet tegnes et parato-diagram:
+
+#### Parato-diagrammer {.tabset .tabset-fade}
+
+##### Skadekategorier 
+
+```{r pareto_skade, echo=FALSE, warning=FALSE, message=FALSE}
+#=================================================
+# BEREGNING
+#=================================================
+gtt_ae_types <- gtt |> 
+  gather(severity, category, E:I) |> 
+  na.omit()
+
+#=================================================
+# PLOT
+#=================================================
+p3a <- paretochart(gtt_ae_types$category,
+                  title = 'Figur 3a: Parto-diagram over skadekategorier')
+
+ggplotly(p3a)
+```
+
+**FORTOLKNING**
+
+Figur 3a viser fordelingen af patientskader på forskellige skadekategorier. De hyppigst forekommende skader er gastrointestinal skader (\(n = 40\)), efterfulgt af infektioner (\(n = 34\)) og procedurerelaterede skader (\(n = 29\)), der tilsammen udgør ~78.6 % af alle registeret skader. 
+
+Den kummulative kurve viser blandt andet, at tryksår, øvrige skader og fald alle forekommer relativt sjældent (\(KI < 10%\)).
+
+Diagrammet indikerer derfor, at forbedringsindsatser bør fokusere på at forbygge gastrointestinale skader, infektioner og procedurerelaterede skader potentielt vil kunne reducere størstedelen af de registrerede patientskader.
+
+##### Sværhedsgrad af skaderne  
+
+```{r pareto_sværhed, echo=FALSE, message=FALSE, warning=FALSE}
+p3b <- paretochart(gtt_ae_types$severity,
+            title = 'Figur 3b: Pareto-diagram over skadernessværhedsgrad')
+
+ggplotly(p3b)
+```
+
+**FORTOLKNING**
+
+Figur 3b viser fordelingen af patientskader efter alvorlighedsgrad (E-I). Den hyppigst forekommende alvorlighedsgrad er kategori E med 89 tilfælde svarende til ca. 68 % af alle registrerede skader. Kategori F er den næsthyppigste med 38 tilfælde (ca. 29 %).
+
+De midlertidige skader (kategori E og F) udgør tilsammen 127 ud af 131 skader (\(KI ≈ 97 %)), hvilket indikerer, at langt størstedelen af de registrerede patientskader medførte midlertidig skade. De alvorligere skader, herunder permanent skade (G), livstruende skade med behov for livreddende behandling (H) og død (I), forekommer kun i fire tilfælde samlet (\(KI ≈ 3 %\)).
+
+Pareto-diagrammet viser således, at næsten alle registrerede patientskader findes i kategorierne E og F, mens de mest alvorlige skader er sjældne i datasættet.
+
+
+

@@ -1,0 +1,566 @@
+---
+title: "Case 3: Coronary artery bypass graft"
+author: "Amanda Wittendorf"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+> Denne sektion er baseret afsnittet "Case 3: Coronary artery bypass graft" fra hjemmesiden (https://anhoej.github.io/qicharts2/articles/qicharts2.html), hvori pakken `qicharts2` er gennemgået. 
+
+```{r pakke, message=FALSE, warning=FALSE, include=FALSE}
+library(qicharts2)
+```
+
+```{r Pre-setting_plots, message=FALSE, warning=FALSE, include=FALSE}
+library(ggplot2)
+library(statistik)
+
+#===================================================
+# THEME
+#===================================================
+standard_tema <- theme_minimal(base_size = 11, base_family = "sans") + 
+  theme(
+    plot.title = element_text(face  = "bold", 
+                              size  = rel(1.2), 
+                              color = "#333333"), 
+    plot.subtitle = element_text(face  = "italic", 
+                                 size  = rel(0.95), 
+                                 color = "#555555"), 
+    axis.title = element_text(size = rel(0.9)), 
+    axis.text = element_text(size = rel(0.85)), 
+    legend.position = "bottom",
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+theme_set(standard_tema)
+
+#===================================================
+# COLORS 
+#===================================================
+mint      <- "#66C2A5"
+koral     <- "#FC8D62"
+pink      <- "#E78AC3"
+blue      <- "#8DA0CB"
+apple     <- "#A6D854"
+yellow    <- "#FFD92F"
+sand      <- "#E5C494"
+stone     <- "#B3B3B3"
+color_pal <- "Set2"
+```
+
+## Beskrivelse af datasættet (cabg)
+
+Datasætte `cabg` stammer fra pakken `qicharts2` og indeholder data fra patienter, der har gennemgået en koronar bypassoperation (CABG), hvor man ønsker at undersøge variation i kirurgiske resultater over tid.
+
+```
+CABG (Coronary Artery Bypass Graft) er en hjerteoperation, hvor blokerede kranspulsårer omgås for at forbedre blodgennemstrømningen til hjertet.
+```
+
+Datasættet består af 2.205 observationer (patienter) og 6 variable. Hver række repræsenterer én patient og dennes operationsforløb.
+
+- $\text{data}$: Dato for operationen. Variablen kan anvendes til tidsserier og kontrolkort.
+
+- $\text{age}$: Patientens alder i år på operationstidspunktet
+
+- $\text{gender}$: Patientens køn (Male / Female)
+
+- $\text{los}$: Indlæggelsestid (liggetid) i antal dage efter operationen.
+
+- $\text{death}$: Angiver om patienten døde inden for 30 dage efter operationen. (TRUE = død inden for 30 dage / FALSE = overlevede mindst 30 dage).
+
+- $\text{readmission}$: Angiver om patienten blev genindlagt inden for 30 dage efter operationen, uanset årsag. (TRUE = genindlagt / FALSE = ikke genindlagt).
+
+```{r datasæt, echo=FALSE, message=FALSE, warning=FALSE}
+cabg <- cabg |>
+  mutate(gender = fct_recode(gender, "kvinde" = "Female", "mand" = "Male")) |> 
+  rename(tid   = los,
+         re_in = readmission,
+         sex   = gender)
+```
+
+
+## SBP-analyse: Behandling for CABG iht alder 
+
+En tabeloversigt og et seriekort vil blive konstrueret for at få et generelt overblik over forløbet.
+
+```{r oversigt, echo=FALSE, warning=FALSE, message=FALSE}
+library(DT)
+#--------------------------
+cabg |> 
+  as_tibble() |> 
+  rename(
+    "Operationsdato"           = date,
+    "Patients alder (år)"      = age,
+    "Patients køn"             = sex,
+    "Patients liggetid (dage)" = tid,
+    "Patientdød (<30 dage)"    = death,
+    "Genindlagt (<30 dage)"    = re_in
+  ) |> 
+  datatable(caption = "Tabel 1: Oversigt over datasættet",
+            rownames = TRUE,
+            class = "row-border", 
+            options = list(
+              autoWidth = TRUE)) |> 
+  formatRound(columns = "Patients alder (år)", digits = 0)
+```
+
+Tabeloversigten viser, at der er over 2.200 patienter med i datasættet, hvilket vil gøre diagrammerne ulæselig. Derfor vil en selekteret antal (\(n = 100\)) blive brugt i diagrammerne vha funktionen `tail(cabg, 100)`. 
+
+### Seriekort
+
+```{r seriekort, echo=FALSE, warning=FALSE, message=FALSE}
+library(plotly)
+#-----------------------------------------------
+p <- qic(age,
+    data      = tail(cabg, 100),
+    title     = 'Figur 1: Seriekort for patientens alder på operationstidspunktet (n = 100)',
+    ylab      = 'Patients alder (år)',
+    xlab      = 'Patient ID-nummer')
+
+ggplotly(p)
+```
+
+**FORTOLKNING**
+
+Seriekortet viser umiddelbart en stabil proces med tilfældig variation omkring baseline-medianen på 67,4 år, da der ikke registreres nogen statistisk signifikante skift (ingen røde punkter/linjer i plottet). Der ses dog et enkelt ekstremt dyk i patientalder omkring patient #70. Da et seriekort ikke har kontrolgrænser, giver dette dyk anledning til at undersøge data nærmere med et kontrolkort for at afgøre, om der er tale om 'special cause'-variation (en signifikant outlier).
+
+---------------------------------
+
+### I-kort: Individuelle målinger
+
+Kontrolkortet vil blive plottet som et I-kort, da vi undersøger individuelle målinger (patienternes individuelle alder). 
+
+```{r I_kontrolkort, message=FALSE, echo=FALSE, warning=FALSE}
+options(qic.clshade = FALSE)        # Fjerner den grå baggrund i figurerne
+#------------------------------------------------
+p2 <- qic(age,
+          data      = tail(cabg, 100), 
+          chart     = 'i',
+          title     = 'Figur 2: Kontrolkort for patientens alder på operationstidspunktet (n = 100)',
+          ylab      = 'Patients alder (år)',
+          xlab      = 'Patient ID-nummer')
+
+ggplotly(p2)
+```
+
+**FORTOLKNING**
+
+Patienternes alder er generelt stabil omkring 66 år, men kontrolkortet bekræfter hypotesen om, at der er tale om 'special cause'-variation for to individer (#45 og #70), da de ligger uden for grænseværdierne (\(LCL; UCL\)) - også kaldt  Shewharts 3σ-grænse. De to patienter er atypisk unge sammenlignet med patienterne som indgår i forløbet. 
+
+```
+På hjemmesiden er MR-kort også gennemgået, men fordi MR-kortet identificerer de samme usædvanlige observationer som I-kortet, tilfører den derfor begrænset ny information og vil ikke gennemgås her...
+
+```
+
+For at vurdere hvor stor betydning de to outliners (#45 og #70) har på forløbet, vil samme I-kort konstruere, men uden at indgå i beregningen af centerlinje og kontrolgrænser. 
+
+```{r I_kontrolkort_eks, warning=FALSE, message=FALSE, echo=FALSE}
+p3 <- qic(age,
+          data    = tail(cabg, 100), 
+          chart   = 'i',
+          exclude = c(45, 70),
+          title   = 'Figur 3: Kontrolkort for patientens alder på operationstidspunktet (n = 100)',
+          ylab    = 'Patients alder (år)',
+          xlab    = 'Patient ID-nummer')
+
+ggplotly(p3)
+```
+
+**FORTOLKNING**
+
+Når de ekstreme signaler ekskluderes fra beregningen har det marginal påvirkning på kontrolgrænserne: 
+
+| Effekt | Figur 2 | Figur 3 | 
+|:-------|:-------:|:-------:|
+| LCL | 41.9 | 43.2 |
+| Centerlinje | 66.3 | 67.2 |
+| UCL | 90.8 | 91.2 | 
+
+Disse marginale ændring fortæller, at de ikke har haft stor indflydelse på den samlede procesbeskrivelse og de øvrige patienter derfor udgør en relativ stabil proces. Derfor kan det argumenteres for, at #45 og #70 repræsentere enkeltstående afvigelser snarere end en systematisk påvirkning af processen.  
+
+--------------------------
+
+### Procesniveau og -variation
+
+For at vurdere disse to, vil to plots blive konstrueret; et X-kort (procesniveau) og s-kort (procesvariation).
+
+**Procesniveau:** Vurdere om der er sket ændringer i den gennemsnitlige alder blandt de opererede patienter over tid.
+
+**Procesvariation:** To målinger kan godt have samme gennemsnit og samtidig have en stor variation (gennemsnitlige standardafvigelse (SD)).  
+
+#### Visualisering af kontrolkortene {.tabset .tabset-fade}
+
+##### Procesniveau (X-kort)
+
+```{r X_kort, warning=FALSE, message=FALSE, echo=FALSE}
+#===========================================================
+# MÅNEDSGENNEMSNIT
+#===========================================================
+cabg <- cabg %>% 
+  mutate(month = as.Date(cut(date, 'month')))
+
+#===========================================================
+# PLOT
+#===========================================================
+p4 <- qic(month, age,
+          data  = cabg,
+          chart = 'xbar',
+          title   = 'Figur 4: Kontrolkort for den gennemsnitlige alder på operationstidspunktet',
+          ylab    = 'Patients alder (år)',
+          xlab    = 'Månedsgennemsnit')
+
+ggplotly(p4)
+```
+
+**FORTOLKNING**
+
+Figur 4 viser, at den gennemsnitlige alder blandt patienter, som gennemgik CABG-operation, varierer stabilt omkring 67,8 år uden tegn på særlig variation. Ingen månedlige gennemsnit overskrider kontrolgrænserne, og der ses hverken trends eller runs.
+
+##### Procesvariation (S-kort)
+
+```{r S_kort, warning=FALSE, message=FALSE, echo=FALSE}
+p5 <- qic(month, age,
+          data  = cabg,
+          chart = 's',
+          title   = 'Figur 5: Kontrolkort for den gennemsnitlige aldersvariation på operationstidspunktet',
+          ylab    = 'Patients alder (år)',
+          xlab    = 'Månedsgennemsnit')
+
+ggplotly(p5)
+```
+
+**FORTOLKNING**
+
+Figur 5 viser tilsvarende, at variationen i patienternes alder er stabil over tid. Standardafvigelsen ligger gennem hele perioden inden for kontrolgrænserne, hvilket indikerer en konsistent alderssammensætning mellem månederne.
+
+####
+
+**Konkluderne** peger X̄- og S-kortet på en statistisk stabil proces uden tegn på ændringer i hverken gennemsnitsalder eller aldersvariation.
+
+## SBP-analyse: Behandling for CABG iht genindlæggelse og mortalitet
+
+For at analysere disse forhold, vil et P-kontrolkort blive konstruere for hver til at vise %-andelen for genindlæggelser. 
+
+Før dette kan gøres, skal genindlæggelsen per måned beregnes
+
+```{r andel_gen_in_&_død, echo=FALSE, message=FALSE, warning=FALSE}
+#===========================================================
+# BEREGNING
+#===========================================================
+cabg_by_month <- cabg |>  
+  group_by(month) |>  
+  summarise(deaths   = sum(death),
+            re_in    = sum(re_in),
+            n        = n())
+
+#===========================================================
+# TABELOVERSIGT
+#===========================================================
+cabg_by_month |> 
+  as_tibble() |> 
+  rename(
+    "Måned for genindlæggelse"  = month,
+    "Patientdød (<30 dage)"     = deaths,
+    "Genindlagt (<30 dage)"     = re_in,
+    "Antal genindlæggelser (n)" = n
+  ) |> 
+  datatable(caption = "Tabel 2: Oversigt over genindlæggelse og patientdød efter operation",
+            rownames = TRUE,
+            class = "row-border", 
+            options = list(
+              autoWidth = TRUE)) 
+```
+
+### Visualisering over genindlæggelse og mortaliteten {.tabset .tabset-fade}
+
+#### Genindlæggelse
+
+```{r p_kort_genindlæggelse, echo=FALSE, warning=FALSE, message=FALSE}
+p6a <- qic(month, re_in, n,
+          data      = cabg_by_month,
+          chart     = 'p',
+          y.percent = TRUE,
+          title     = 'Figur 6a: Kontrolkort for genindlæggelse inden for 30 dage efter operationen',
+          ylab      = NULL,
+          xlab      = 'Månedsgennemsnit')
+
+ggplotly(p6a)
+```
+
+**FORTOLKNING**
+
+Gennemsnitlig er der 21.6 % af patienterne som bliver genindlagt inden for 30 dage efter operationen for CABG. Hvis intet ændres vil man forvente at dette forsætte med et interval mellem 7.6% til 35.6 %. 
+
+#### Mortalitet
+
+```{r p_kort_mortalitet, echo=FALSE, warning=FALSE, message=FALSE}
+p6b <- qic(month, deaths, n,
+          data      = cabg_by_month,
+          chart     = 'p',
+          y.percent = TRUE,
+          title     = 'Figur 6b: Kontrolkort for mortalitet inden for 30 dage efter operationen',
+          ylab      = NULL,
+          xlab      = 'Månedsgennemsnit')
+
+ggplotly(p6b)
+```
+
+**FORTOLKNING**
+
+Dette kontrolkort viser, at mortaliteten er lavere hændende end genindlæggelse idet gennemsnitte er 3.1%. Dog er det bemærkelsesværdigt, at der i fire måneder af 2012 kun døde 1 person per måned. 
+
+###
+
+-----------------------------
+
+For at undersøge hvorfor der kun døde 1 person i de fire måneder af 2021 (maj, juli, august og september) vil et T- og G-kontrolkort blive anvendt. For begge diagrammer repræsenterer hvert datapunkt intervallet mellem to på hinanden følgende dødsfald, dvs. hvor lang tid eller antal operationer, der er gået, fra én person døde, til den næste person døde. 
+
+- Høje værdier repræsentere en længere tidsperiode eller flere operationer er foretaget inden næste dødsfald.
+
+- Lave værdier repræsentere nye dødsfald inden for relativ kort tid mellem hinanden. 
+
+- Midterlinjen angiver den gennemsnitlige afstand mellem dødsfaldene.
+
+For at konstruere disse diagrammer skal man først beregne antal af operation og dage mellem dødsfald. 
+
+```{r aarsag_1_mort, warning=FALSE, message=FALSE, echo=FALSE}
+#===========================================================
+# BEREGNING
+#===========================================================
+omkommen <- cabg |>  
+  mutate(x = row_number()) |>  
+  filter(death) |> 
+  mutate(dd = x - lag(x) - 1,    # Antal operationer mellem dødsfald
+         dt = date - lag(date))  # Antal dage mellem dødsfald
+
+#===========================================================
+# TABELOVERSIGT
+#===========================================================
+omkommen |> 
+  as_tibble() |> 
+  select(
+    x, date, death, dd, dt
+  ) |> 
+  rename(
+    "Løbenummer for operation"        = x,
+    "Operationsdato"                  = date,
+    "Patientdød (<30 dage)"           = death,
+    "Operationer mellem dødsfald (n)" = dd,
+    "Dage mellem dødsfald (n)"        = dt
+  ) |> 
+  datatable(caption = "Tabel 3: Oversigt over operationer",
+            rownames = FALSE,
+            class = "row-border", 
+            options = list(
+              autoWidth = TRUE)) 
+```
+
+
+### Visualisering {.tabset .tabset-fade}
+
+#### Antal operationer mellem dødsfald (G-kort)
+
+```{r g_kort_død, warning=FALSE, message=FALSE, echo=FALSE}
+p7a <- qic(dd,
+           data  = omkommen,
+           chart = 'g',
+           title = 'Figur 7a: Antal operationer mellem dødsfald',
+           ylab  = 'Antal',
+           xlab  = 'Dødsfald')
+
+ggplotly(p7a)
+```
+
+
+#### Antal dage mellem dødsfald (T-kort)
+
+```{r T_kort_død, warning=FALSE, message=FALSE, echo=FALSE}
+p7b <- qic(dt,
+           data  = omkommen,
+           chart = 't',
+           title = 'Figur 7b: Antal dage mellem dødsfald',
+           ylab  = 'Antal',
+           xlab  = 'Dødsfald')
+
+ggplotly(p7b)
+```
+
+
+###
+
+**FORTOLKNING**
+
+For begge diagrammer er #25 en outlier, fordi den er placeret på den anden side af den øvre grænseværdi (\(UCL = 97.3\)), hvoraf der er forgået 182 operationer mellem to dødsfald (Figur 7a) med et dagsinterval på 117 dage (Figur 7b). Da det hænder for samme observation i begge grafer øger det troværdigheden. Intervallet er usædvanligt langt og signalere derfor om special cause-variation hvilket betyder, at det med højt sandsynlighed ikke alene skyldes tilfældig variation. 
+
+Mulige årsager til denne pludselige forbedring kan blandt andet skyles (1) en reel forbedring i kvalitet eller patientsikkerhed, (2) ændring i patientpopulationen (mindre syge patienter), (3) ændret registrering,
+eller (4) blot en enkelt sjælden, men statistisk mulig hændelse. 
+
+Dog er det værd at bemærke, at de efterfølgende punkter ikke forbliver højere men falder tilbage til et sammenlignelig mønster som forinden #25. Dette taler for, at outlieren er et enkeltstående tilfælde og der derfor ikke er umiddelbart evidens for en varig forbedring af processen efterfølgende. 
+
+--------------
+
+Det er også muligt at undersøge forskellen på genindlæggelse baseret på køn - altså om der er forskel på genindlæggelsen mellem mænd og kvinder. Til at besvare dette, vil et P-kontrolkort igen blive brugt til at visualisere %-andelen for genindlæggelser stratificeret efter køn. 
+
+```{r stratificeret_køn, warning=FALSE, echo=FALSE, message=FALSE}
+#===========================================================
+# BEREGNING
+#===========================================================
+cabg_by_month_gender <- cabg  |>  
+  group_by(month, sex) |> 
+  summarise(re_in = sum(re_in),
+            n            = n())
+
+#===========================================================
+# TABELOVERSIGT
+#===========================================================
+cabg_by_month_gender |> 
+  as_tibble() |> 
+  rename(
+    "Måned for genindlæggelse"  = month,
+    "Køn"                       = sex,
+    "Genindlagt (<30 dage)"     = re_in,
+    "Antal genindlæggelser (n)" = n
+  ) |> 
+  datatable(caption = "Tabel 4: Oversigt over genindlæggelse stratificeret efter køn",
+            rownames = FALSE,
+            class = "row-border", 
+            options = list(
+              autoWidth = TRUE)) 
+```
+
+```{r graf_strat, echo=FALSE, warning=FALSE, message=FALSE}
+p7 <- qic(month, re_in, n,
+          data      = cabg_by_month_gender,
+          facets    = ~ sex, 
+          chart     = 'p',
+          y.percent = TRUE,
+          title     = 'Figur 8: Kontrolkort over %-andelen af genindlæggelser stratificeret efter køn',
+          ylab      = '',
+          xlab      = 'Månedsgennemsnit')
+
+ggplotly(p7)
+```
+
+**FORTOLKNING**
+
+Figur 8 viser et stratificeret diagram over mænd og kvinders %-andel af genindlæggelser, hvoraf der ses en tydelig forskel mellem de to køn.
+
+For mænd er der et smalt interval mellem de to grænseværdier, hvilket indikerer en høj præcision af målingerne og den gennemsnitlig %-andel på 21.5 %. Derudover er der ingen umiddelbare tegn på, at være andet en tilfældig variation mellem hvert datapunkt.
+
+Anderledes står det til hos kvinderne. Selvom ingen af datapunkterne overskrider grænseværdierne, og den gennemsnitlige %-andel er sammenlignelig med mændenes (22.3 %), tyder mønstret i datapunkterne på, at der kunne være mere på færde end tilfældig variation. Diagrammet viser et usædvanligt langt run over midterlinjen fra d. 2013-06-01 på ni datapunkter over midterlinjen, hvilket taler for en systematiske ændringer i forløbet. 
+
+Den systematiske ændringer for kvinder kunne skyldes, at der er et fåtal af kvinder end mænd i datasættet, da intervallet for mændenes grænseværdier er meget smallere end kvindernes. 
+
+
+-----------------------------
+
+For at undersøge om der generelt er forskel på mænd og kvinders samlede gennemsnit af genindlæggelser (\(mænd = 21,5 % / kvinder = 22,3 %\)) vil der blive foretaget en (\(chi^2-test\)):
+
+```{r chi_test, warning=FALSE, message=FALSE, echo=FALSE}
+cabg |> 
+  xtabs(~ sex + re_in, data = _) |> 
+  chisq.test()|> 
+  broom::tidy() |> 
+  knitr::kable(digits = 3, 
+               col.names = c("Chi-i-anden værdi", "p-værdi", "Frihedsgrader (df)", "Metode"))
+```
+**FORTOLKNING**
+
+Den marginale in-signifikante forskel på 1 %-point mellem mænd og kvinder fortæller, at forskellen mellem kønnene er ren tilfældig og kvindernes bredde grænseinterval derfor udelukkende skyldes et fåtal af kvinder i datasætte.  
+
+------------------------------------
+
+For at kortlægge en mulig årsag til, hvorfor kvinderne udviser en mulig systematisk ændring i forløbet, dvs. det usædvanlige lange run over midterlinjen, vil der blive konstrueret tre yderligere kontrolkort: 
+
+### {.tabset .tabset-fade}
+
+#### (1) Xbar-kort over kvindernes gennemsnitlige alder. 
+
+Kortet vil blive brugt til at undersøge, om der i slutningen af 2013 blev opereret væsentlig flere ældre kvinder end normalt.
+
+```{r xbar_alder_strat, echo=FALSE, message=FALSE, warning=FALSE}
+p9a <- qic(month, age,
+          data  = cabg,
+          facets    = ~ sex, 
+          chart = 'xbar',
+          title   = 'Figur 9a: Kontrolkort for den gennemsnitlige alder på operationstidspunktet stratificeret efter køn',
+          ylab    = 'Patients alder (år)',
+          xlab    = 'Månedsgennemsnit') 
+
+ggplotly(p9a)
+```
+
+#### (2) Xbar-kort over kvindernes indlæggelsestid
+
+Her vil kortet blive anvendt til at vurdere, om kvinderne lå indlagt i længere tid efter deres bypassoperation i den periode. Hvis det stemmer overens, er kan det være et tegn på, at de generelt var mere syge, havde flere komplikationer, eller at udskrivelsesproceduren ændrede sig.
+
+```{r xbar_ind_strat, echo=FALSE, message=FALSE, warning=FALSE}
+p9b <- qic(month, tid,
+          data  = cabg,
+          facets    = ~ sex, 
+          chart = 'xbar',
+          title   = 'Figur 9b: Kontrolkort for den gennemsnitlige liggetid stratificeret efter køn',
+          ylab    = 'Patientens liggetid',
+          xlab    = 'Månedsgennemsnit')
+
+ggplotly(p9b)
+```
+
+#### (3) P-kort over kvindernes dødelighed
+
+Til sidst, vil det også blivve vurderet om højere genindlæggelsesrate havde en højere dødelighed inden for 30 dage - hvis dødeligheden ikke steg, men genindlæggelserne gjorde, kan det tyde på, at problemet i den periode snarere handlede om overvågningen efter udskrivelsen (f.eks. at man genindlagde for en sikkerheds skyld) frem for mere kritiske kirurgiske fejl.
+
+```{r p_strat_død, echo=FALSE, warning=FALSE, message=FALSE}
+#===========================================================
+# BEREGNING
+#===========================================================
+cabg_death <- cabg  |>  
+  group_by(month, sex) |>
+  summarise(death = sum(death),
+            n            = n())
+
+#===========================================================
+# PLOT
+#===========================================================
+p9c <- qic(month, death, n,
+          data      = cabg_death,
+          facets    = ~ sex, 
+          chart     = 'p',
+          y.percent = TRUE,
+          title     = 'Figur 9c: Kontrolkort over %-andelen af dødelighed stratificeret efter køn',
+          ylab      = '',
+          xlab      = 'Månedsgennemsnit')
+
+ggplotly(p9c)
+```
+
+### 
+
+**FORTOLKNING**
+
+Ingen af de overstående figurer (figur 9a - 9c) kan foreklare hvorfor kvinderne har et usædvanlige langt run over midterlinjen fra d. 2013-06-01, da ingen af figurerne udviser samme mønster som figur 8. Det vil sige, at hverken patienternes alder (Figur 9a), deres liggetid (Figur 9b) eller en øget dødelighed (Figur 9c) i samme periode kan forklare, hvorfor der var et usædvanlig højt genindlæggelser i slutningen af 2013 (Figur 8).
+
+Figur 9c viser dog, at afdelingen oplevede en alvorlig, men isoleret krise med høj dødelighed blandt kvinder i marts 2013 (outlier). Dette var dog en enlig svale og blev hurtigt bragt under kontrol.
+
+Det tyder derfor på, at det usædvanlige lange run blandt kvinder i slutningen af 2013, ikke skyldes de kliniske patientdata, men skyldes organisatoriske eller administrative ændringer på afdelingen. Det kan f.eks. være, at  man ændrede kriterierne for, hvornår en patient skulle genindlægges, eller at opfølgningen i eget hjem blev ændret, hvilket sendte flere kvinder tilbage i systemet, uden at de fejlede noget mere alvorligt; hvilket understøttes af, at dødeligheden ikke steg.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

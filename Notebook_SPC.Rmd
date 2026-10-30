@@ -12,6 +12,7 @@ library(qicharts2)
 
 ```{r Pre-setting_plots, message=FALSE, warning=FALSE, include=FALSE}
 library(ggplot2)
+library(statistik)
 
 #===================================================
 # THEME
@@ -67,9 +68,7 @@ Formålet med at analysere procesdata er at opdage, hvornår en reel ændring sk
 
 **Hvornår:** Findes i alle processer og gør processen forudsigelig inden for visse grænser.
 
-**Hvorfor:** Forhold, der altid er til stede i systemet og anses derfor som værende praksis "støj" eller naturlig tilfældig variation *(Random Effects)*.
-
-**Håndtering:**
+**Hvorfor:** Forhold, der altid er til stede i systemet og anses derfor som værende praksis "støj" eller naturlig tilfældig variation *(Random Variation)*.
 
 **SPC-diagram:** Data opføre sig tilfældigt inden for de forventede grænser.
 
@@ -100,6 +99,8 @@ Der findes to typer af SPC-diagrammer; (1) seriekort *(Run charts)* og (2) kontr
 I dette eksempel, vil baseres på 24 genererede tal fra en normalfordeling, som er gemt i et navngivet objekt kaldt y.
 
 ```{r seriekort, echo=TRUE, message=FALSE, warning=FALSE}
+library(plotly)
+
 #-------------------------------------------------------------------
 # Præ-kodning
 #-------------------------------------------------------------------
@@ -110,13 +111,15 @@ options(qic.clshade = FALSE)        # Fjerner den grå baggrund i figurerne
 #-------------------------------------------------------------------
 # Figur
 #-------------------------------------------------------------------
-p <- qic(y) 
-p + labs(
+p <- qic(y) +
+  labs(
     title    = "Seriekort",
     subtitle = "Baseret på generede en normalfordelt talværdi (n = 24)",
     y        = "Måling",
     x        = "Observationnummer"
   )
+
+ggplotly(p)
 ```
 
 ### Kontrolkort (engelsk: Control Charts)
@@ -132,7 +135,7 @@ Det findes forskellige typer af kontrolkort, alt efter hvad man ønsker at under
 | Korttype | Anvendelse | Fordeling | 
 |:---------|:----------:|:---------:|
 | i | Individuelle målinger (fx blodtryk, ventetid, alder) | Normal (Gaussian) | 
-| MR | Bevægelsesbredde mellem målinger | Normal |
+| mr | Bevægelsesbredde ("Moving Range") mellem målinger / variation fra observation til observation\n 1. Er variationen stabil? \n 2. Er enkelte udsving usædvanligt store? \n 3. Kan variationen bruges til at beregne  kontrolgrænserne på I-kortet? | Normal |
 | xbar | Gennemsnit af grupper | Normal |
 | s | Standardafvigelser i grupper | Normal | 
 | t | Tid mellem sjældne hændelser | Eksponentiel |
@@ -153,19 +156,37 @@ Valget af kontrolkort bør styres af datatypen og den underliggende fordeling:
 
 Hvis datatypen matcher kontrolkortets antagelser, bliver kontrolgrænserne og signalerne om specialårsagsvariation mere pålidelige.
 
+#### Splittelse af perioderne 
+
+Splittelse af perioderne (genberegning af kontrolgrænser) bør kun gøres, når et observeret processkift kan forklares og forventes at være varigt. Ifølge Wheeler kan dette ske, når:
+
+1. Data viser en tydelig ændring i procesadfærden.
+
+2. Årsagen til ændringen er kendt.
+
+3. Den nye adfærd er ønskværdig.
+Det forventes, at ændringen fortsætter fremover.
+
+Hvis én eller flere af disse betingelser ikke er opfyldt, bør signalet i stedet undersøges nærmere for at identificere den bagvedliggende årsag.
+
+```
+Eksempel: Se R Markdown "TASK_2.Rmd"
+```
+
 #### EKSEMPEL
 
 Forsætter fra tidligere eksempel, men hvor der kontrolleres for individuelle målinger - dvs. tilføjelse af `chart = 'i'` 
 
 ```{r kontrolkort, echo=TRUE, message=FALSE, warning=FALSE}
-p1 <- qic(y, chart = 'i')
-p1 + labs(
+p1 <- qic(y, chart = 'i') + 
+  labs(
     title    = "Kontrolkort",
     y        = "Måling",
     x        = "Observationnummer"
   )
-```
 
+ggplotly(p1)
+```
 
 ### Fortolkning af diagrammerne 
 
@@ -226,8 +247,7 @@ Reglerne bygger på to simple tests omkring medianen:
 # Fejl (n = 22) med 4 SD 
 y[22] <- 4
 
-p2 <- qic(y, chart = 'i')
-p2 + 
+p2 <- qic(y, chart = 'i') + 
   labs(title    = "Figure A",
        subtitle = "Baseret på generede en normalfordelt talværdi (n = 24)",
        y        = "Måling",
@@ -239,6 +259,8 @@ p2 +
            ymax  = Inf, 
            fill  = koral, 
            alpha = 0.1)
+
+ggplotly(p2)
 ```
 
 ###### Et permanent niveauskift *(Persistent Shift)*
@@ -248,8 +270,7 @@ p2 +
 y[13:24] <- rnorm(12,          # Generer 12 tilfældige tal fra en normalfordeling
                   mean = 2)    # Gens. er løftet til 2 --> simulerer en pludselig ændring 
 
-p3 <- qic(y, chart = 'i')
-p3 + 
+p3 <- qic(y, chart = 'i') + 
   labs(title    = "Figure B",
        subtitle = "Baseret på generede en normalfordelt talværdi (n = 24)",
        y        = "Måling",
@@ -261,6 +282,8 @@ p3 +
            ymax  = Inf, 
            fill  = koral, 
            alpha = 0.1)
+
+ggplotly(p3)
 ```
 
 ##### Fortolkning
@@ -273,7 +296,68 @@ Western Electric-regel 4 er opfyldt, idet mere end 8 successive punkter ligger p
 
 ----
 
+## Pareto analyse 
 
+Pareto-analyse er et prioriteringsværktøj, der anvendes til at identificere de kategorier, som bidrager mest til et problem. Formålet er at fokusere forbedringsindsatser på de få årsager, der står for størstedelen af hændelserne.
+
+Ligesom før, tegnes der her også et diagram men i stedet for kontinuert data, anvendes data kategoriseret og sorteret efter hyppighed. Diagrammet indeholder følgende: 
+
+- **Søjler:** Antallet i hver kategori. Sorteres efter hyppighed i faldende rækkefølge
+
+- **Kurve:** Kummulative %-andel
+
+### EKSEMPEL 
+ 
+I dette eksempel, vil `gtt` blev anvendt. Datasættet indeholder data om patientskade under indlæggelse. 
+...
+
+For bedre at kunne identificere hvilke skader og hvilke intensitet af disse der forekommer hyppigst i forløbet tegnes et parato-diagram:
+
+#### Parato-diagrammer {.tabset .tabset-fade}
+
+##### Skadekategorier 
+
+```{r pareto_skade, echo=TRUE, warning=FALSE, message=FALSE}
+#=================================================
+# BEREGNING
+#=================================================
+gtt_ae_types <- gtt |> 
+  gather(severity, category, E:I) |> 
+  na.omit()
+
+#=================================================
+# PLOT
+#=================================================
+p3a <- paretochart(gtt_ae_types$category,
+                  title = 'Figur 3a: Parto-diagram over skadekategorier')
+
+ggplotly(p3a)
+```
+
+**FORTOLKNING**
+
+Figur 3a viser fordelingen af patientskader på forskellige skadekategorier. De hyppigst forekommende skader er gastrointestinal skader (\(n = 40\)), efterfulgt af infektioner (\(n = 34\)) og procedurerelaterede skader (\(n = 29\)), der tilsammen udgør ~78.6 % af alle registeret skader. 
+
+Den kummulative kurve viser blandt andet, at tryksår, øvrige skader og fald alle forekommer relativt sjældent (\(KI < 10%\)).
+
+Diagrammet indikerer derfor, at forbedringsindsatser bør fokusere på at forbygge gastrointestinale skader, infektioner og procedurerelaterede skader potentielt vil kunne reducere størstedelen af de registrerede patientskader.
+
+##### Sværhedsgrad af skaderne  
+
+```{r pareto_sværhed, echo=TRUE, message=FALSE, warning=FALSE}
+p3b <- paretochart(gtt_ae_types$severity,
+            title = 'Figur 3b: Pareto-diagram over skadernessværhedsgrad')
+
+ggplotly(p3b)
+```
+
+**FORTOLKNING**
+
+Figur 3b viser fordelingen af patientskader efter alvorlighedsgrad (E-I). Den hyppigst forekommende alvorlighedsgrad er kategori E med 89 tilfælde svarende til ca. 68 % af alle registrerede skader. Kategori F er den næsthyppigste med 38 tilfælde (ca. 29 %).
+
+De midlertidige skader (kategori E og F) udgør tilsammen 127 ud af 131 skader (\(KI ≈ 97 %)), hvilket indikerer, at langt størstedelen af de registrerede patientskader medførte midlertidig skade. De alvorligere skader, herunder permanent skade (G), livstruende skade med behov for livreddende behandling (H) og død (I), forekommer kun i fire tilfælde samlet (\(KI ≈ 3 %\)).
+
+Pareto-diagrammet viser således, at næsten alle registrerede patientskader findes i kategorierne E og F, mens de mest alvorlige skader er sjældne i datasættet.
 
 
 
