@@ -359,6 +359,24 @@ De midlertidige skader (kategori E og F) udgør tilsammen 127 ud af 131 skader (
 
 Pareto-diagrammet viser således, at næsten alle registrerede patientskader findes i kategorierne E og F, mens de mest alvorlige skader er sjældne i datasættet.
 
+----------------------------
+
+## Tragtplot (Funnel Plot)
+
+En grafisk metode til at sammenligne resultater mellem forskellige enheder, f.eks. hospitaler, afdelinger, kommuner eller læger, samtidig med at der tages højde for forskelle i stikprøvestørrelse.
+
+- X-aksen viser typisk antal observationer eller populationens størrelse.
+
+- Y-aksen viser en præstationsindikator, f.eks. infektionsrate eller dødelighed.
+
+- En vandret linje viser det gennemsnitlige niveau.
+
+- Kontrolgrænserne omkring gennemsnittet bliver smallere jo større datamængden er, hvilket giver den karakteristiske "tragtform".
+
+**Tilfældig variation:** Hvis et hospital ligger inden for tragtens kontrolgrænser, er dets resultat foreneligt med normal tilfældig variation.
+
+**Reelle afvigelser:** Hvis et hospital ligger uden for kontrolgrænserne, kan det være en statistisk signifikant afvigelse, der fortjener yderligere analyse.
+
 
 
 
